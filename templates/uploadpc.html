@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+{% load static %}
+
+<html>
+<head>
+    <title>emma - AI-based Digital Healthcare Platform</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        header {
+            background-color: #FFFFFF;
+            padding: 5px;
+            margin-bottom: 20px;
+        }
+        .card-body-custom {
+            padding: 20px;
+        }
+        h1 {
+            font-size: 32px;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <img id="logo" src="{% static 'img/Emma.ico' %}" alt="Logo" style="width: 100px; height: auto; margin-right: 30px;">
+            <h1>AI-based Digital Healthcare Platform</h1>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="row">
+            <section class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-body card-body-custom">
+                        <div>
+                            <img id="aiAgent" src="{% static 'img/ai_avatar.png' %}" alt="AI Agent" class="img-fluid">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-body card-body-custom">
+                        <div class="upload-content">
+                            <div>
+                                <video id="webcam" autoplay playsinline class="img-fluid"></video>
+                                <button id="startRecording" class="btn btn-primary mt-2">녹화 시작</button>
+                                <div id="timer" class="mt-2"></div>
+                                <div id="uploadMessage" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-body card-body-custom">
+                        <div>
+                            <img id="example" src="{% static 'img/example_img.png' %}" class="img-fluid">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body card-body-custom">
+                        <h2>설문조사</h2>
+                        <p>설문조사 내용 추가</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body card-body-custom">
+                        <div class="row">
+                            <div class="col-md-6" id="emotionalState">
+                                <h2>Emotional State</h2>
+                                <p id="Emotional">--</p>
+                            </div>
+                            <div class="col-md-6" id="heartRate">
+                                <h2>심박수</h2>
+                                <img src="{% static 'img/heart.gif' %}" alt="Heart" style="width: 50px; height: 50px;">
+                                <p id="heartRateValue">--</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6" id="respirationRate">
+                                <h2>호흡률</h2>
+                                <img src="{% static 'img/res.gif' %}" alt="Respiration" style="width: 50px; height: 50px;">
+                                <p id="respirationRateValue">--</p>
+                            </div>
+                            <div class="col-md-6" id="stressScore">
+                                <h2>스트레스 점수</h2>
+                                <img src="{% static 'img/stress.gif' %}" alt="Stress" style="width: 50px; height: 50px;">
+                                <p id="stressScoreValue">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script>
+        let timerInterval;
+        let fileName;
+
+        async function getVideoStream() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('webcam').srcObject = stream;
+                return stream;
+            } catch (err) {
+                console.error('Error accessing webcam: ', err);
+            }
+        }
+
+        function recordVideo(stream) {
+            const mediaRecorder = new MediaRecorder(stream);
+            let chunks = [];
+
+            mediaRecorder.ondataavailable = function(event) {
+                if (event.data.size > 0) {
+                    chunks.push(event.data);
+                }
+            };
+            mediaRecorder.onstop = function() {
+                const blob = new Blob(chunks, { type: 'video/mp4' });
+                chunks = [];
+                uploadVideo(blob);
+            };
+            mediaRecorder.start();
+
+            startTimer(mediaRecorder);
+        }
+
+        function startTimer(mediaRecorder) {
+            let timeLeft = 45;
+            document.getElementById('timer').textContent = `Time left: ${timeLeft} seconds`;
+
+            timerInterval = setInterval(() => {
+                timeLeft -= 1;
+                document.getElementById('timer').textContent = `Time left: ${timeLeft} seconds`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    mediaRecorder.stop();
+                }
+            }, 1000);
+
+            const now = new Date();
+            fileName = `${now.getFullYear()}_${now.getMonth() + 1}_${now.getDate()}_${now.getHours()}_${now.getMinutes()}.mp4`;
+        }
+
+        async function uploadVideo(blob) {
+            const formData = new FormData();
+            formData.append('video', blob, fileName);
+
+            try {
+                const response = await fetch('/video_upload/upload_server/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById('uploadMessage').textContent = '완료!';
+                    document.getElementById('uploadMessage').style.color = 'green';
+                } else {
+                    document.getElementById('uploadMessage').textContent = `업로드 실패: ${result.error}`;
+                    document.getElementById('uploadMessage').style.color = 'red';
+                }
+            } catch (err) {
+                document.getElementById('uploadMessage').textContent = '업로드 실패';
+                document.getElementById('uploadMessage').style.color = 'red';
+                console.error('Error uploading video:', err);
+            }
+        }
+
+        document.getElementById('startRecording').addEventListener('click', async () => {
+            document.getElementById('uploadMessage').textContent = '';
+            const stream = await getVideoStream();
+            recordVideo(stream);
+        });
+    </script>
+</body>
+</html>
